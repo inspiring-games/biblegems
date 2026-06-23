@@ -1,0 +1,62 @@
+{
+  "name": "Gem",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "ID of the user who created this gem"
+    },
+    "user_nickname": {
+      "type": "string",
+      "description": "Cached nickname for display"
+    },
+    "user_avatar": {
+      "type": "string",
+      "description": "Cached avatar URL for display"
+    },
+    "book": {
+      "type": "string",
+      "description": "Bible book name"
+    },
+    "chapter": {
+      "type": "number",
+      "description": "Chapter number"
+    },
+    "verse": {
+      "type": "number",
+      "description": "Verse number"
+    },
+    "content": {
+      "type": "string",
+      "description": "Markdown content of the reflection"
+    },
+    "likes_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of likes"
+    },
+    "liked_by": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "User IDs who liked this gem"
+    },
+    "hidden_by": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "User IDs who hid this gem"
+    }
+  },
+  "required": [
+    "user_id",
+    "book",
+    "chapter",
+    "verse",
+    "content"
+  ]
+}

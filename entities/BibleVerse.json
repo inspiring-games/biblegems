@@ -1,0 +1,41 @@
+{
+  "name": "BibleVerse",
+  "type": "object",
+  "properties": {
+    "translation_id": {
+      "type": "string",
+      "description": "Translation identifier e.g. KJV, NIV"
+    },
+    "book": {
+      "type": "string",
+      "description": "Bible book name"
+    },
+    "chapter": {
+      "type": "number",
+      "description": "Chapter number"
+    },
+    "verse": {
+      "type": "number",
+      "description": "Verse number"
+    },
+    "text": {
+      "type": "string",
+      "description": "The verse text"
+    }
+  },
+  "required": [
+    "translation_id",
+    "book",
+    "chapter",
+    "verse",
+    "text"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {},
+    "update": {
+ 

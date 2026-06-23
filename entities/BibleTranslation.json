@@ -1,0 +1,41 @@
+{
+  "name": "BibleTranslation",
+  "type": "object",
+  "properties": {
+    "translation_id": {
+      "type": "string",
+      "description": "Short code like KJV, NIV, ESV"
+    },
+    "name": {
+      "type": "string",
+      "description": "Full name like King James Version"
+    },
+    "verse_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of verses imported"
+    }
+  },
+  "required": [
+    "translation_id",
+    "name"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
