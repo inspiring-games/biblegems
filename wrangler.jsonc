@@ -1,14 +1,28 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
+  "$schema": "https://json.schemastore.org/wrangler.json",
   "name": "biblegems",
+  "main": "src/index.js",
+  "type": "javascript",
   "compatibility_date": "2026-06-22",
+  "compatibility_flags": ["nodejs_compat"],
+  
+  "assets": {
+    "directory": "dist",
+    "binding": "ASSETS"
+  },
+  
   "observability": {
     "enabled": true
   },
-  "assets": {
-    "directory": "dist"
-  },
-  "compatibility_flags": [
-    "nodejs_compat"
-  ]
+  
+  "env": {
+    "production": {
+      "routes": [
+        {
+          "pattern": "biblegems.online/*",
+          "zone_name": "biblegems.online"
+        }
+      ]
+    }
+  }
 }
