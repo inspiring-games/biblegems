@@ -37,3 +37,15 @@ Open [Base44.com](http://Base44.com) and click on Publish.
 Documentation: [https://docs.base44.com/Integrations/Using-GitHub](https://docs.base44.com/Integrations/Using-GitHub)
 
 Support: [https://app.base44.com/support](https://app.base44.com/support)
+
+## Migrating to Supabase
+
+This project currently uses Base44 for auth and data access. To move it to Supabase and host the frontend on Cloudflare Pages, you will need to:
+
+1. Create a Supabase project.
+2. Enable Auth with email/password and Google providers.
+3. Create tables for users, gems, bible verses, translations, reports, follows, and blocks.
+4. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` as environment variables.
+5. Replace Base44-specific client code in `src/api/base44Client.js` and `src/lib/AuthContent.jsx` with Supabase equivalents.
+
+See `SUPABASE_MIGRATION.md` for a detailed migration outline.

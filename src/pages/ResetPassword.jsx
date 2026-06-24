@@ -9,7 +9,7 @@ import AuthLayout from "@/components/AuthLayout";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
-  const resetToken = searchParams.get("token");
+  const resetToken = searchParams.get("token") || searchParams.get("access_token");
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -58,6 +58,11 @@ export default function ResetPassword() {
       icon={Lock}
       title="New password"
       subtitle="Enter your new password below"
+      footer={
+        <Link to="/login" className="text-primary font-medium hover:underline">
+          Back to log in
+        </Link>
+      }
     >
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
@@ -74,3 +79,43 @@ export default function ResetPassword() {
               type="password"
               autoComplete="new-password"
               autoFocus
+              placeholder="Enter new password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="pl-10 h-12"
+              required
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="confirmPassword">Confirm password</Label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+            <Input
+              id="confirmPassword"
+              type="password"
+              autoComplete="new-password"
+              placeholder="Confirm your new password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="pl-10 h-12"
+              required
+            />
+          </div>
+        </div>
+
+        <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Reset password
+            </>
+          ) : (
+            "Reset password"
+          )}
+        </Button>
+      </form>
+    </AuthLayout>
+  );
+}

@@ -18,6 +18,7 @@ export default function Login() {
     e.preventDefault();
     setError("");
     setLoading(true);
+
     try {
       await base44.auth.loginViaEmailPassword(email, password);
       window.location.href = "/";
@@ -38,12 +39,17 @@ export default function Login() {
       title="Welcome back"
       subtitle="Log in to your account"
       footer={
-        <>
-          Don't have an account?{" "}
-          <Link to="/register" className="text-primary font-medium hover:underline">
-            Create one
+        <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+          <span>
+            Don't have an account?{' '}
+            <Link to="/register" className="text-primary font-medium hover:underline">
+              Create one
+            </Link>
+          </span>
+          <Link to="/forgot-password" className="text-primary font-medium hover:underline">
+            Forgot your password?
           </Link>
-        </>
+        </div>
       }
     >
       <Button
@@ -74,3 +80,49 @@ export default function Login() {
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
           <div className="relative">
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              autoFocus
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="pl-10 h-12"
+              required
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+            <Input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="pl-10 h-12"
+              required
+            />
+          </div>
+        </div>
+
+        <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Signing in...
+            </>
+          ) : (
+            "Sign in"
+          )}
+        </Button>
+      </form>
+    </AuthLayout>
+  );
+}
