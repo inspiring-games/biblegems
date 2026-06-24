@@ -1,0 +1,16 @@
+{
+  "name": "Bible Gems",
+  "short_name": "Bible Gems",
+  "description": "Share short reflections on scripture with a calm reading-focused community.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
+  ]
+}

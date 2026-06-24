@@ -3,16 +3,29 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase environment variables are not set. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
-}
+export const supabaseEnvError = !supabaseUrl || !supabaseAnonKey
+  ? 'Supabase environment variables are missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY and rebuild the app.'
+  : null;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
+const createErrorProxy = (message) => new Proxy(() => {
+  throw new Error(message);
+}, {
+  get: () => () => { throw new Error(message); },
 });
+
+const createDummySupabase = (message) => ({
+  auth: createErrorProxy(message),
+  from: () => createErrorProxy(message),
+});
+
+export const supabase = supabaseEnvError
+  ? createDummySupabase(supabaseEnvError)
+  : createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+      },
+    });
 
 export const supabaseAuth = {
   signInWithPassword: async (email, password) => {

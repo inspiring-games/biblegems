@@ -14,6 +14,7 @@ import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
+import { supabaseEnvError } from '@/api/supabaseClient';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -55,6 +56,27 @@ const AuthenticatedApp = () => {
 
 
 function App() {
+  if (supabaseEnvError) {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center px-4 py-8">
+        <div className="max-w-2xl rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
+          <h1 className="text-3xl font-semibold mb-4">Configuration error</h1>
+          <p className="mb-4 text-slate-700">
+            Your app is missing required Supabase environment variables.
+            This site cannot connect to Supabase until those values are provided.
+          </p>
+          <div className="rounded-xl bg-slate-100 p-4 text-sm text-slate-800">
+            <strong className="block mb-2">Please set these environment variables:</strong>
+            <code className="block break-words">VITE_SUPABASE_URL</code>
+            <code className="block break-words mt-1">VITE_SUPABASE_ANON_KEY</code>
+          </div>
+          <p className="mt-4 text-slate-500 text-sm">
+            Then rebuild and redeploy the app.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <AuthProvider>
