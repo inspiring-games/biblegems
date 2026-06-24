@@ -110,8 +110,14 @@ export default function Profile() {
           role: 'user'
         });
       }
-      setUser(updated);
-      setProfileUser(updated);
+      const mergedUser = {
+        ...user,
+        ...updated,
+        profile_id: updated.id,
+        id: user.id
+      };
+      setUser(mergedUser);
+      setProfileUser(mergedUser);
       setEditing(false);
       toast({ title: 'Profile saved' });
     } catch (error) {

@@ -19,7 +19,15 @@ export const AuthProvider = ({ children }) => {
     if (error && error.code !== 'PGRST116') {
       throw error;
     }
-    return data ? { ...userData, ...data } : { ...userData, id: userData.id };
+    if (!data) {
+      return { ...userData, id: userData.id };
+    }
+    return {
+      ...userData,
+      ...data,
+      profile_id: data.id,
+      id: userData.id
+    };
   };
 
   const checkUserAuth = async () => {
