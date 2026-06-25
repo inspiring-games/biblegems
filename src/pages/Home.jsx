@@ -251,22 +251,11 @@ export default function Home() {
         <VerseDisplay book={book} chapter={chapter} verse={verse} text={verseText} translation={translationId} />
       </div>
 
-      {/* Search bar */}
-      <div className="rounded-3xl border border-border bg-card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Search gems</p>
-            <p className="text-sm text-muted-foreground">Search reflections for this verse.</p>
-          </div>
-        </div>
-        <SearchBar value={search} onChange={setSearch} onClear={() => setSearch('')} />
-      </div>
 
       {/* Share / add gem */}
       <div className="rounded-3xl border border-border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Reflection</p>
             <p className="text-lg font-semibold">Share your gem</p>
           </div>
         </div>
@@ -288,12 +277,20 @@ export default function Home() {
         )}
       </div>
 
-      {/* Gems list */}
+      {/* Search bar */}
       <div className="rounded-3xl border border-border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Gems</p>
-            <p className="text-lg font-semibold">{displayedGems.length} reflections</p>
+            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Search gems</p>
+          </div>
+        </div>
+        <SearchBar value={search} onChange={setSearch} onClear={() => setSearch('')} />
+        <p>&nbsp;</p>
+      {/* Gems list */}
+      
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-lg font-semibold">{displayedGems.length} gems</p>
           </div>
           {loading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
         </div>
