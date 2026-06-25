@@ -228,108 +228,97 @@ export default function Home() {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <section className="space-y-6">
-          <div className="rounded-3xl border border-border bg-card p-6">
-            <div className="flex items-center justify-between gap-4 mb-4">
-              <div>
-                <p className="text-sm font-medium uppercase tracking-[0.24em] text-muted-foreground">Bible Verse</p>
-                <h2 className="text-2xl font-semibold">{verseReference}</h2>
-              </div>
-              <Sparkles className="w-6 h-6 text-primary" />
-            </div>
-            <VerseDisplay book={book} chapter={chapter} verse={verse} text={verseText} translation={translationId} />
+    <div className="space-y-6">
+      {/* Verse selector first */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="flex items-center justify-between mb-4">
+        </div>
+        <ScriptureSelector
+          book={book}
+          chapter={chapter}
+          verse={verse}
+          onSelect={(newBook, newChapter, newVerse) => {
+            setBook(newBook);
+            setChapter(newChapter);
+            setVerse(newVerse);
+          }}
+        />
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-2xl font-semibold">{verseReference}</h2>
           </div>
+        </div>
+        <VerseDisplay book={book} chapter={chapter} verse={verse} text={verseText} translation={translationId} />
+      </div>
 
-          <div className="rounded-3xl border border-border bg-card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Search gems</p>
-                <p className="text-sm text-muted-foreground">Search reflections for this verse.</p>
-              </div>
-            </div>
-            <SearchBar value={search} onChange={setSearch} onClear={() => setSearch('')} />
+      {/* Search bar */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Search gems</p>
+            <p className="text-sm text-muted-foreground">Search reflections for this verse.</p>
           </div>
+        </div>
+        <SearchBar value={search} onChange={setSearch} onClear={() => setSearch('')} />
+      </div>
 
-          <div className="rounded-3xl border border-border bg-card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Gems</p>
-                <p className="text-lg font-semibold">{displayedGems.length} reflections</p>
-              </div>
-              {loading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
-            </div>
-
-            <div className="space-y-4">
-              {displayedGems.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No gems found for this verse yet.</p>
-              ) : (
-                displayedGems.map((gem) => (
-                  <GemCard
-                    key={gem.id}
-                    gem={gem}
-                    isOwn={gem.user_id === user.id}
-                    currentUserId={user.id}
-                    onFollow={handleFollow}
-                    onHide={handleHideGem}
-                    onReport={() => setReportTarget(gem)}
-                    onEdit={handleEditGem}
-                    onProfileClick={(id) => navigate(`/profile/${id}`)}
-                    showReference
-                    isFollowing={follows.some((item) => item.following_id === gem.user_id)}
-                  />
-                ))
-              )}
-            </div>
+      {/* Share / add gem */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Reflection</p>
+            <p className="text-lg font-semibold">Share your gem</p>
           </div>
-        </section>
-
-        <aside className="space-y-6">
-          <div className="rounded-3xl border border-border bg-card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Select Verse</p>
-                <p className="text-lg font-semibold">Browse scripture</p>
-              </div>
-            </div>
-            <ScriptureSelector
+        </div>
+        <Button onClick={() => { resetEditor(); setShowEditor(true); }} className="w-full">
+          Add a new gem
+        </Button>
+        {showEditor && (
+          <div className="mt-6">
+            <GemEditor
               book={book}
               chapter={chapter}
               verse={verse}
-              onSelect={(newBook, newChapter, newVerse) => {
-                setBook(newBook);
-                setChapter(newChapter);
-                setVerse(newVerse);
-              }}
+              existingGem={editingGem}
+              onSave={handleSaveGem}
+              onCancel={resetEditor}
+              saving={saving}
             />
           </div>
+        )}
+      </div>
 
-          <div className="rounded-3xl border border-border bg-card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Reflection</p>
-                <p className="text-lg font-semibold">Share your gem</p>
-              </div>
-            </div>
-            <Button onClick={() => { resetEditor(); setShowEditor(true); }} className="w-full">
-              Add a new gem
-            </Button>
-            {showEditor && (
-              <div className="mt-6">
-                <GemEditor
-                  book={book}
-                  chapter={chapter}
-                  verse={verse}
-                  existingGem={editingGem}
-                  onSave={handleSaveGem}
-                  onCancel={resetEditor}
-                  saving={saving}
-                />
-              </div>
-            )}
+      {/* Gems list */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Gems</p>
+            <p className="text-lg font-semibold">{displayedGems.length} reflections</p>
           </div>
-        </aside>
+          {loading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
+        </div>
+
+        <div className="space-y-4">
+          {displayedGems.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No gems found for this verse yet.</p>
+          ) : (
+            displayedGems.map((gem) => (
+              <GemCard
+                key={gem.id}
+                gem={gem}
+                isOwn={gem.user_id === user.id}
+                currentUserId={user.id}
+                onFollow={handleFollow}
+                onHide={handleHideGem}
+                onReport={() => setReportTarget(gem)}
+                onEdit={handleEditGem}
+                onProfileClick={(id) => navigate(`/profile/${id}`)}
+                showReference
+                isFollowing={follows.some((item) => item.following_id === gem.user_id)}
+              />
+            ))
+          )}
+        </div>
       </div>
 
       <ReportDialog open={!!reportTarget} onClose={() => setReportTarget(null)} onSubmit={handleReportSubmit} submitting={reportSubmitting} />
