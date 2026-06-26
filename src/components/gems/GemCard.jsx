@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Heart, UserPlus, UserCheck, EyeOff, Flag, ChevronDown, ChevronUp, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { formatReference } from '@/lib/bibleData';
+import { BIBLE_BOOKS, formatReference } from '@/lib/bibleData';
 import moment from 'moment';
 import GemEditor from '@/components/gems/GemEditor';
 import { base44 } from '@/api/base44Client';
@@ -21,6 +21,7 @@ export default function GemCard({
   onDelete,
   onProfileClick,
   onNavigateVerse,
+  onTagSelect,
   showReference
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -29,7 +30,6 @@ export default function GemCard({
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    // Fetch current user display info
     const fetchUserDisplay = async () => {
       try {
         const users = await base44.entities.User.filter({ user_id: gem.user_id });
@@ -59,6 +59,33 @@ export default function GemCard({
   const needsExpand = gem.content?.length > 300;
   const initials = (userDisplay?.name || 'U').slice(0, 2).toUpperCase();
 
+  const linkedReferences = useMemo(() => {
+    if (!gem.content) return [];
+    const matches = [];
+    const referencePattern = /(?<book>(?:[1-3]\s+)?[A-Za-z]+(?:\s+[A-Za-z]+)?)\s+(?<chapter>\d{1,3})(?::(?<verse>\d{1,3})(?:-(?<endVerse>\d{1,3}))?)?/g;
+    for (const match of gem.content.matchAll(referencePattern)) {
+      const groups = match.groups || {};
+      const normalizedBook = (groups.book || '').trim().replace(/^\d+\s+/, '');
+      const matchedBook = BIBLE_BOOKS.find((book) => book.name.toLowerCase() === normalizedBook.toLowerCase());
+      const bookName = matchedBook?.name || normalizedBook;
+      const chapter = Number(groups.chapter || 1);
+      const verse = Number(groups.verse || 1);
+      if (!bookName) continue;
+      matches.push({
+        label: match[0],
+        book: bookName,
+        chapter,
+        verse
+      });
+    }
+    return matches;
+  }, [gem.content]);
+
+  const hashtags = useMemo(() => {
+    if (!gem.content) return [];
+    return Array.from(new Set(gem.content.matchAll(/#[A-Za-z0-9_/-]+/g))).map((match) => match[0]);
+  }, [gem.content]);
+
   const handleDeleteConfirm = async () => {
     if (window.confirm('Are you sure you want to delete this gem?')) {
       setDeleting(true);
@@ -81,7 +108,7 @@ export default function GemCard({
         verse={gem.verse}
         existingGem={gem}
         onSave={async (content) => {
-          await onEdit?.(gem);
+          await onEdit?.(gem, content);
           setEditing(false);
         }}
         onCancel={() => setEditing(false)}
@@ -94,7 +121,6 @@ export default function GemCard({
 
   return (
     <div className={`group rounded-xl border bg-card p-4 sm:p-5 transition-all duration-200 ${isOwn ? 'border-primary/30 shadow-sm ring-1 ring-primary/10' : 'border-border hover:shadow-sm'}`}>
-      {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <button onClick={() => onProfileClick?.(gem.user_id)} className="shrink-0">
@@ -132,7 +158,6 @@ export default function GemCard({
         )}
       </div>
 
-      {/* Content */}
       <div className={`mt-3 text-sm leading-relaxed text-foreground/90 ${!expanded && needsExpand ? 'max-h-28 overflow-hidden relative' : ''}`}>
         <ReactMarkdown className="prose prose-sm prose-stone max-w-none">
           {gem.content}
@@ -141,6 +166,32 @@ export default function GemCard({
           <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-card to-transparent" />
         )}
       </div>
+      {linkedReferences.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {linkedReferences.map((reference, index) => (
+            <button
+              key={`${reference.label}-${index}`}
+              onClick={() => onNavigateVerse?.(reference.book, reference.chapter, reference.verse)}
+              className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10"
+            >
+              {reference.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {hashtags.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {hashtags.map((tag) => (
+            <button
+              key={tag}
+              onClick={() => onTagSelect?.(tag)}
+              className="rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+      )}
       {needsExpand && (
         <button
           onClick={() => setExpanded(!expanded)}
@@ -151,10 +202,8 @@ export default function GemCard({
         </button>
       )}
 
-      {/* Actions */}
       <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between">
         <div className="flex items-center gap-1">
-          {/* Like count always visible; button only if handler provided */}
           {onLike ? (
             <Button
               variant="ghost"

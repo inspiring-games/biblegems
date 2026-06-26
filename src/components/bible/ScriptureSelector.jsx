@@ -9,7 +9,7 @@ function NavBtn({ onClick, title, children }) {
     <button
       onClick={onClick}
       title={title}
-      className="px-1.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors font-mono leading-none"
+      className="h-11 min-w-11 px-3 py-2 text-base text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors font-mono leading-none"
     >
       {children}
     </button>
@@ -73,10 +73,6 @@ export default function ScriptureSelector({ book, chapter, verse, onSelect }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2 text-muted-foreground mb-1">
-        <Book className="w-4 h-4" />
-        <span className="text-xs font-heading font-medium uppercase tracking-wider">Scripture</span>
-      </div>
 
       {/* Selectors */}
       <div className="flex flex-col sm:flex-row gap-2">
@@ -119,7 +115,7 @@ export default function ScriptureSelector({ book, chapter, verse, onSelect }) {
         <NavBtn onClick={prevBook} title="Previous book">«</NavBtn>
         <NavBtn onClick={prevChapter} title="Previous chapter">‹‹</NavBtn>
         <NavBtn onClick={prevVerse} title="Previous verse">‹</NavBtn>
-        <span className="flex-1 text-center text-xs text-muted-foreground font-heading">
+        <span className="flex-1 text-center font-heading text-2xl font-semibold">
           {book} {chapter}:{verse}
         </span>
         <NavBtn onClick={nextVerse} title="Next verse">›</NavBtn>

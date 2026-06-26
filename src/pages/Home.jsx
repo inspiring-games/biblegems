@@ -148,9 +148,21 @@ export default function Home() {
     }
   };
 
-  const handleEditGem = (gem) => {
-    setEditingGem(gem);
-    setShowEditor(true);
+  const handleEditGem = async (gem, content) => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    try {
+      await base44.entities.Gem.update(gem.id, { content });
+      toast({ title: 'Gem updated' });
+      setEditingGem(null);
+      setShowEditor(false);
+      loadGems();
+    } catch (error) {
+      console.error('Could not update gem', error);
+      toast({ title: 'Unable to update gem', description: error.message || 'Please try again.' });
+    }
   };
 
   const handleReportSubmit = async (reason) => {
@@ -208,11 +220,15 @@ export default function Home() {
       await base44.entities.BlockedUser.create({ blocker_id: user.id, blocked_id: gem.user_id });
       setBlockedIds((prev) => Array.from(new Set([...prev, gem.user_id])));
       setGems((prev) => prev.filter((item) => item.user_id !== gem.user_id));
-      toast({ title: 'Hidden gems from this user' });
+      toast({ title: 'Blocked this user and hid their gems' });
     } catch (error) {
       console.error('Could not hide gem', error);
       toast({ title: 'Unable to hide gem', description: error.message || 'Please try again.' });
     }
+  };
+
+  const handleTagSelect = (tag) => {
+    setSearch(tag);
   };
 
   const handleFollow = async (authorId) => {
@@ -263,7 +279,6 @@ export default function Home() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Select Verse</p>
-            <p className="text-lg font-semibold">Browse scripture</p>
           </div>
         </div>
         <ScriptureSelector
@@ -276,17 +291,8 @@ export default function Home() {
             setVerse(newVerse);
           }}
         />
-      </div>
 
       {/* Verse display */}
-      <div className="rounded-3xl border border-border bg-card p-6">
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <div>
-            <p className="text-sm font-medium uppercase tracking-[0.24em] text-muted-foreground">Bible Verse</p>
-            <h2 className="text-2xl font-semibold">{verseReference}</h2>
-          </div>
-          <Sparkles className="w-6 h-6 text-primary" />
-        </div>
         <VerseDisplay book={book} chapter={chapter} verse={verse} text={verseText} translation={translationId} />
       </div>
 
@@ -295,44 +301,14 @@ export default function Home() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Search gems</p>
-            <p className="text-sm text-muted-foreground">Search reflections for this verse.</p>
           </div>
         </div>
         <SearchBar value={search} onChange={setSearch} onClear={() => setSearch('')} />
-      </div>
-
-      {/* Share / add gem */}
-      <div className="rounded-3xl border border-border bg-card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Reflection</p>
-            <p className="text-lg font-semibold">Share your gem</p>
-          </div>
-        </div>
-        <Button onClick={() => { resetEditor(); setShowEditor(true); }} className="w-full">
-          Add a new gem
-        </Button>
-        {showEditor && (
-          <div className="mt-6">
-            <GemEditor
-              book={book}
-              chapter={chapter}
-              verse={verse}
-              existingGem={editingGem}
-              onSave={handleSaveGem}
-              onCancel={resetEditor}
-              saving={saving}
-            />
-          </div>
-        )}
-      </div>
-
+        <p>&nbsp;</p>
       {/* Gems list */}
-      <div className="rounded-3xl border border-border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Gems</p>
-            <p className="text-lg font-semibold">{displayedGems.length} reflections</p>
+            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">{displayedGems.length} gem{displayedGems.length !== 1 ? 's' : ''}</p>
           </div>
           {loading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
         </div>
@@ -359,12 +335,36 @@ export default function Home() {
                   setChapter(chapter);
                   setVerse(verse);
                 }}
+                onTagSelect={handleTagSelect}
                 showReference
                 isFollowing={follows.some((item) => item.following_id === gem.user_id)}
               />
             ))
           )}
         </div>
+      <p>&nbsp;</p>
+      {/* Share / add gem */}
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Share your gem</p>
+          </div>
+        </div>
+        <Button onClick={() => { resetEditor(); setShowEditor(true); }} className="w-full">
+          Add a new gem
+        </Button>
+        {showEditor && (
+          <div className="mt-6">
+            <GemEditor
+              book={book}
+              chapter={chapter}
+              verse={verse}
+              existingGem={editingGem}
+              onSave={handleSaveGem}
+              onCancel={resetEditor}
+              saving={saving}
+            />
+          </div>
+        )}
       </div>
 
       <ReportDialog open={!!reportTarget} onClose={() => setReportTarget(null)} onSubmit={handleReportSubmit} submitting={reportSubmitting} />
