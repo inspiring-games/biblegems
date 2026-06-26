@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Sparkles, X } from 'lucide-react';
+import { Sparkles, X, Trash2 } from 'lucide-react';
 import { formatReference } from '@/lib/bibleData';
 
-export default function GemEditor({ book, chapter, verse, existingGem, onSave, onCancel, saving }) {
+export default function GemEditor({ book, chapter, verse, existingGem, onSave, onCancel, onDelete, saving, deleting }) {
   const [content, setContent] = useState(existingGem?.content || '');
   const ref = formatReference(book, chapter, verse);
   const isEdit = !!existingGem;
@@ -33,14 +33,28 @@ export default function GemEditor({ book, chapter, verse, existingGem, onSave, o
       />
       <div className="flex items-center justify-between mt-3">
         <span className="text-xs text-muted-foreground">{content.length}/5000</span>
-        <Button
-          onClick={() => onSave(content)}
-          disabled={!content.trim() || saving}
-          size="sm"
-          className="font-heading"
-        >
-          {saving ? 'Saving…' : isEdit ? 'Update Gem' : 'Share Gem'}
-        </Button>
+        <div className="flex items-center gap-2">
+          {isEdit && onDelete && (
+            <Button
+              onClick={onDelete}
+              disabled={deleting || saving}
+              size="sm"
+              variant="destructive"
+              className="font-heading gap-1.5"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              {deleting ? 'Deleting…' : 'Delete'}
+            </Button>
+          )}
+          <Button
+            onClick={() => onSave(content)}
+            disabled={!content.trim() || saving}
+            size="sm"
+            className="font-heading"
+          >
+            {saving ? 'Saving…' : isEdit ? 'Update Gem' : 'Share Gem'}
+          </Button>
+        </div>
       </div>
     </div>
   );

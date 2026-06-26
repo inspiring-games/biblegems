@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Heart, UserPlus, UserCheck, EyeOff, Flag, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
+import { Heart, UserPlus, UserCheck, EyeOff, Flag, ChevronDown, ChevronUp, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { formatReference } from '@/lib/bibleData';
 import moment from 'moment';
+import GemEditor from '@/components/gems/GemEditor';
+import { base44 } from '@/api/base44Client';
 
 export default function GemCard({
   gem,
@@ -16,13 +18,79 @@ export default function GemCard({
   onHide,
   onReport,
   onEdit,
+  onDelete,
   onProfileClick,
+  onNavigateVerse,
   showReference
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [userDisplay, setUserDisplay] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    // Fetch current user display info
+    const fetchUserDisplay = async () => {
+      try {
+        const users = await base44.entities.User.filter({ user_id: gem.user_id });
+        if (users.length > 0) {
+          const user = users[0];
+          setUserDisplay({
+            name: user.full_name || user.nickname || gem.user_nickname || 'Anonymous',
+            avatar: user.avatar || gem.user_avatar
+          });
+        } else {
+          setUserDisplay({
+            name: gem.user_nickname || 'Anonymous',
+            avatar: gem.user_avatar
+          });
+        }
+      } catch (error) {
+        setUserDisplay({
+          name: gem.user_nickname || 'Anonymous',
+          avatar: gem.user_avatar
+        });
+      }
+    };
+    fetchUserDisplay();
+  }, [gem.user_id, gem.user_nickname, gem.user_avatar]);
+
   const isLiked = gem.liked_by?.includes(currentUserId);
   const needsExpand = gem.content?.length > 300;
-  const initials = (gem.user_nickname || 'U').slice(0, 2).toUpperCase();
+  const initials = (userDisplay?.name || 'U').slice(0, 2).toUpperCase();
+
+  const handleDeleteConfirm = async () => {
+    if (window.confirm('Are you sure you want to delete this gem?')) {
+      setDeleting(true);
+      try {
+        await base44.entities.Gem.delete(gem.id);
+        onDelete?.(gem);
+      } catch (error) {
+        console.error('Delete failed:', error);
+      } finally {
+        setDeleting(false);
+      }
+    }
+  };
+
+  if (editing) {
+    return (
+      <GemEditor
+        book={gem.book}
+        chapter={gem.chapter}
+        verse={gem.verse}
+        existingGem={gem}
+        onSave={async (content) => {
+          await onEdit?.(gem);
+          setEditing(false);
+        }}
+        onCancel={() => setEditing(false)}
+        saving={false}
+        onDelete={handleDeleteConfirm}
+        deleting={deleting}
+      />
+    );
+  }
 
   return (
     <div className={`group rounded-xl border bg-card p-4 sm:p-5 transition-all duration-200 ${isOwn ? 'border-primary/30 shadow-sm ring-1 ring-primary/10' : 'border-border hover:shadow-sm'}`}>
@@ -31,7 +99,7 @@ export default function GemCard({
         <div className="flex items-center gap-3 min-w-0">
           <button onClick={() => onProfileClick?.(gem.user_id)} className="shrink-0">
             <Avatar className="w-9 h-9">
-              <AvatarImage src={gem.user_avatar} />
+              <AvatarImage src={userDisplay?.avatar} />
               <AvatarFallback className="bg-accent text-accent-foreground text-xs font-heading font-medium">
                 {initials}
               </AvatarFallback>
@@ -42,14 +110,17 @@ export default function GemCard({
               onClick={() => onProfileClick?.(gem.user_id)}
               className="text-sm font-heading font-medium text-foreground truncate block hover:text-primary transition-colors"
             >
-              {gem.user_nickname || 'Anonymous'}
+              {userDisplay?.name || 'Anonymous'}
             </button>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               {gem.created_date && <span>{moment(gem.created_date).fromNow()}</span>}
               {showReference && (
-                <span className="text-primary/70 font-medium">
+                <button
+                  onClick={() => onNavigateVerse?.(gem.book, gem.chapter, gem.verse)}
+                  className="text-primary/70 font-medium hover:text-primary transition-colors"
+                >
                   {formatReference(gem.book, gem.chapter, gem.verse)}
-                </span>
+                </button>
               )}
             </div>
           </div>
@@ -118,8 +189,13 @@ export default function GemCard({
 
         <div className="flex items-center gap-0.5">
           {isOwn && onEdit && (
-            <Button variant="ghost" size="sm" onClick={() => onEdit(gem)} className="h-8 px-2 text-muted-foreground">
+            <Button variant="ghost" size="sm" onClick={() => setEditing(true)} className="h-8 px-2 text-muted-foreground">
               <Pencil className="w-3.5 h-3.5" />
+            </Button>
+          )}
+          {isOwn && onDelete && (
+            <Button variant="ghost" size="sm" onClick={handleDeleteConfirm} disabled={deleting} className="h-8 px-2 text-destructive hover:text-destructive">
+              <Trash2 className="w-3.5 h-3.5" />
             </Button>
           )}
           {!isOwn && onHide && (

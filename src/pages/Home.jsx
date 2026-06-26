@@ -158,9 +158,11 @@ export default function Home() {
     setReportSubmitting(true);
     try {
       await base44.entities.Report.create({
-        gem_id: reportTarget.id,
+        target_id: reportTarget.id,
+        target_type: 'gem',
         reporter_id: user.id,
         reason,
+        status: 'pending',
         created_date: new Date().toISOString()
       });
       toast({ title: 'Report submitted' });
@@ -171,6 +173,33 @@ export default function Home() {
     } finally {
       setReportSubmitting(false);
     }
+  };
+
+  const handleLikeGem = async (gem) => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    try {
+      const isLiked = gem.liked_by?.includes(user.id);
+      const newLikedBy = isLiked
+        ? gem.liked_by.filter(id => id !== user.id)
+        : [...(gem.liked_by || []), user.id];
+      await base44.entities.Gem.update(gem.id, {
+        liked_by: newLikedBy,
+        likes_count: newLikedBy.length
+      });
+      setGems(gems.map(g => g.id === gem.id ? { ...g, liked_by: newLikedBy, likes_count: newLikedBy.length } : g));
+      toast({ title: isLiked ? 'Gem unliked' : 'Gem liked' });
+    } catch (error) {
+      console.error('Could not toggle like', error);
+      toast({ title: 'Unable to like gem', description: error.message || 'Please try again.' });
+    }
+  };
+
+  const handleDeleteGem = (gem) => {
+    setGems(gems.filter(g => g.id !== gem.id));
+    toast({ title: 'Gem deleted' });
   };
 
   const handleHideGem = async (gem) => {
@@ -229,9 +258,13 @@ export default function Home() {
 
   return (
     <div className="space-y-6">
-      {/* Verse selector first */}
+      {/* Verse selector */}
       <div className="rounded-3xl border border-border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Select Verse</p>
+            <p className="text-lg font-semibold">Browse scripture</p>
+          </div>
         </div>
         <ScriptureSelector
           book={book}
@@ -243,19 +276,36 @@ export default function Home() {
             setVerse(newVerse);
           }}
         />
+      </div>
+
+      {/* Verse display */}
+      <div className="rounded-3xl border border-border bg-card p-6">
         <div className="flex items-center justify-between gap-4 mb-4">
           <div>
+            <p className="text-sm font-medium uppercase tracking-[0.24em] text-muted-foreground">Bible Verse</p>
             <h2 className="text-2xl font-semibold">{verseReference}</h2>
           </div>
+          <Sparkles className="w-6 h-6 text-primary" />
         </div>
         <VerseDisplay book={book} chapter={chapter} verse={verse} text={verseText} translation={translationId} />
       </div>
 
+      {/* Search bar */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Search gems</p>
+            <p className="text-sm text-muted-foreground">Search reflections for this verse.</p>
+          </div>
+        </div>
+        <SearchBar value={search} onChange={setSearch} onClear={() => setSearch('')} />
+      </div>
 
       {/* Share / add gem */}
       <div className="rounded-3xl border border-border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
+            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Reflection</p>
             <p className="text-lg font-semibold">Share your gem</p>
           </div>
         </div>
@@ -277,20 +327,12 @@ export default function Home() {
         )}
       </div>
 
-      {/* Search bar */}
+      {/* Gems list */}
       <div className="rounded-3xl border border-border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Search gems</p>
-          </div>
-        </div>
-        <SearchBar value={search} onChange={setSearch} onClear={() => setSearch('')} />
-        <p>&nbsp;</p>
-      {/* Gems list */}
-      
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-lg font-semibold">{displayedGems.length} gems</p>
+            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Gems</p>
+            <p className="text-lg font-semibold">{displayedGems.length} reflections</p>
           </div>
           {loading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
         </div>
@@ -305,11 +347,18 @@ export default function Home() {
                 gem={gem}
                 isOwn={gem.user_id === user.id}
                 currentUserId={user.id}
+                onLike={handleLikeGem}
                 onFollow={handleFollow}
                 onHide={handleHideGem}
                 onReport={() => setReportTarget(gem)}
                 onEdit={handleEditGem}
+                onDelete={handleDeleteGem}
                 onProfileClick={(id) => navigate(`/profile/${id}`)}
+                onNavigateVerse={(book, chapter, verse) => {
+                  setBook(book);
+                  setChapter(chapter);
+                  setVerse(verse);
+                }}
                 showReference
                 isFollowing={follows.some((item) => item.following_id === gem.user_id)}
               />
