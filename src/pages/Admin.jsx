@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { tables } from '@/api/supabaseClient';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -116,20 +117,36 @@ function UsersPanel({ toast, navigate }) {
   const [messageText, setMessageText] = useState('');
   const [sending, setSending] = useState(false);
 
-  const loadUsers = () => {
+  const loadUsers = async () => {
     setLoading(true);
-    base44.entities.User.list('-created_date', 200)
-      .then(u => { setUsers(u); setLoading(false); })
-      .catch(err => { console.error('User list error:', err); setLoading(false); });
+    try {
+      const { data, error } = await tables.profiles()
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (err) {
+      console.error('User list error:', err);
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { loadUsers(); }, []);
 
   const handleBan = async (u) => {
     const newRole = u.role === 'banned' ? 'user' : 'banned';
-    await base44.entities.User.update(u.id, { role: newRole });
-    setUsers(users.map(x => x.id === u.id ? { ...x, role: newRole } : x));
-    toast({ title: newRole === 'banned' ? `${u.full_name || u.email} banned` : `${u.full_name || u.email} unbanned` });
+    try {
+      const { error } = await tables.profiles().update({ role: newRole }).eq('id', u.id);
+      if (error) throw error;
+      setUsers(users.map(x => x.id === u.id ? { ...x, role: newRole } : x));
+      toast({ title: newRole === 'banned' ? `${u.full_name || u.email} banned` : `${u.full_name || u.email} unbanned` });
+    } catch (err) {
+      console.error('Ban error:', err);
+      toast({ title: 'Error', description: 'Could not update user role', variant: 'destructive' });
+    }
   };
 
   const handleSendMessage = async () => {
