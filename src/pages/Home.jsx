@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useOutletContext, useNavigate, Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import { tables } from '@/api/supabaseClient';
 import ScriptureSelector from '@/components/bible/ScriptureSelector';
 import VerseDisplay from '@/components/bible/VerseDisplay';
 import SearchBar from '@/components/bible/SearchBar';
@@ -169,14 +170,14 @@ export default function Home() {
     if (!user || !reportTarget) return;
     setReportSubmitting(true);
     try {
-      await base44.entities.Report.create({
-        target_id: reportTarget.id,
-        target_type: 'gem',
+      const { error } = await tables.reports().insert({
+        gem_id: reportTarget.id,
         reporter_id: user.id,
         reason,
         status: 'pending',
         created_date: new Date().toISOString()
       });
+      if (error) throw error;
       toast({ title: 'Report submitted' });
       setReportTarget(null);
     } catch (error) {
