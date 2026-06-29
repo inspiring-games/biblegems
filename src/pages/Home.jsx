@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useOutletContext, useNavigate, Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { tables } from '@/api/supabaseClient';
+import { insertReport } from '@/api/reporting';
 import ScriptureSelector from '@/components/bible/ScriptureSelector';
 import VerseDisplay from '@/components/bible/VerseDisplay';
 import SearchBar from '@/components/bible/SearchBar';
@@ -171,7 +172,7 @@ export default function Home() {
     if (!user || !reportTarget) return;
     setReportSubmitting(true);
     try {
-      const { error } = await tables.reports().insert({
+      const { error } = await insertReport(tables.reports(), {
         target_id: reportTarget.id,
         target_type: 'gem',
         reporter_id: user.id,
