@@ -22,7 +22,8 @@ export default function GemCard({
   onProfileClick,
   onNavigateVerse,
   onTagSelect,
-  showReference
+  showReference,
+  canDelete = false
 }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -225,7 +226,7 @@ export default function GemCard({
               <Pencil className="w-3.5 h-3.5" />
             </Button>
           )}
-          {isOwn && onDelete && (
+          {(isOwn || canDelete) && onDelete && (
             <Button variant="ghost" size="sm" onClick={handleDeleteConfirm} disabled={deleting} className="h-8 px-2 text-destructive hover:text-destructive">
               <Trash2 className="w-3.5 h-3.5" />
             </Button>

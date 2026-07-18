@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useOutletContext, useNavigate, Link, useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { tables } from '@/api/supabaseClient';
@@ -54,12 +54,12 @@ export default function Home() {
   const [verseText, setVerseText] = useState('');
   const [translationId, setTranslationId] = useState('');
   const [gems, setGems] = useState([]);
-  const [recentGems, setRecentGems] = useState([]);
   const [follows, setFollows] = useState([]);
   const [blockedIds, setBlockedIds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState(null);
+  const [visibleVerseCount, setVisibleVerseCount] = useState(8);
 
   const [showEditor, setShowEditor] = useState(false);
   const [editingGem, setEditingGem] = useState(null);
@@ -76,6 +76,8 @@ export default function Home() {
       .then((results) => setBlockedIds(results.map((row) => row.blocked_id)))
       .catch(() => {});
   }, [user]);
+
+  const isAdmin = user?.role === 'admin';
 
   const applyVerseSelection = useCallback((nextBook, nextChapter, nextVerse, mode = 'push') => {
     setBook(nextBook);
@@ -143,28 +145,19 @@ export default function Home() {
 
   const loadGems = useCallback(() => {
     setLoading(true);
-    base44.entities.Gem.filter({ book, chapter, verse })
-      .then((results) => setGems(results))
+    base44.entities.Gem.filter({ book, chapter })
+      .then((results) => setGems(results || []))
       .catch(() => setGems([]))
       .finally(() => setLoading(false));
-  }, [book, chapter, verse]);
-
-  const loadRecentGems = useCallback(async () => {
-    try {
-      const results = await base44.entities.Gem.list('-created_date', 6);
-      setRecentGems(results || []);
-    } catch {
-      setRecentGems([]);
-    }
-  }, []);
+  }, [book, chapter]);
 
   useEffect(() => {
+    setVisibleVerseCount(8);
     loadGems();
-    loadRecentGems();
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ book, chapter, verse }));
     } catch {}
-  }, [book, chapter, verse, loadGems, loadRecentGems]);
+  }, [book, chapter, verse, loadGems]);
 
   useEffect(() => {
     const query = search.trim().toLowerCase();
@@ -216,7 +209,6 @@ export default function Home() {
       }
       resetEditor();
       loadGems();
-      loadRecentGems();
     } catch (error) {
       console.error('Could not save gem', error);
       toast({ title: 'Unable to save gem', description: error.message || 'Please try again.' });
@@ -236,7 +228,6 @@ export default function Home() {
       setEditingGem(null);
       setShowEditor(false);
       loadGems();
-      loadRecentGems();
     } catch (error) {
       console.error('Could not update gem', error);
       toast({ title: 'Unable to update gem', description: error.message || 'Please try again.' });
@@ -329,8 +320,26 @@ export default function Home() {
   };
 
   const visibleGems = gems.filter((gem) => !blockedIds.includes(gem.user_id));
-  const visibleRecentGems = recentGems.filter((gem) => !blockedIds.includes(gem.user_id));
   const displayedGems = searchResults ?? visibleGems;
+
+  const groupedVerseGems = useMemo(() => {
+    const groups = visibleGems.reduce((acc, gem) => {
+      const verse = Number(gem.verse || 1);
+      if (!acc[verse]) acc[verse] = [];
+      acc[verse].push(gem);
+      return acc;
+    }, {});
+
+    return Object.entries(groups)
+      .sort(([left], [right]) => Number(left) - Number(right))
+      .map(([verse, verseGems]) => ({
+        verse: Number(verse),
+        gems: verseGems.sort((a, b) => Number(a.verse || 1) - Number(b.verse || 1))
+      }));
+  }, [visibleGems]);
+
+  const visibleVerseGroups = groupedVerseGems.slice(0, visibleVerseCount);
+  const hasMoreVerseGroups = groupedVerseGems.length > visibleVerseGroups.length;
 
   if (!user) {
     return (
@@ -358,15 +367,14 @@ export default function Home() {
       <div className="rounded-3xl border border-border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Select Verse</p>
+            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Select chapter</p>
           </div>
         </div>
         <ScriptureSelector
           book={book}
           chapter={chapter}
-          verse={verse}
           onSelect={(newBook, newChapter, newVerse) => {
-            applyVerseSelection(newBook, newChapter, newVerse);
+            applyVerseSelection(newBook, newChapter, newVerse || 1);
           }}
         />
 
@@ -391,56 +399,77 @@ export default function Home() {
           {loading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
         </div>
 
-        <div className="mb-6 rounded-2xl border border-border/70 bg-background/60 p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Recent</p>
-          </div>
-          {visibleRecentGems.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No recent gems yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {visibleRecentGems.map((gem) => (
-                <button
-                  key={gem.id}
-                  onClick={() => applyVerseSelection(gem.book, gem.chapter, gem.verse)}
-                  className="flex w-full items-start justify-between rounded-xl border border-border/70 bg-card/70 px-3 py-2 text-left transition-colors hover:bg-accent"
-                >
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium text-foreground">{gem.content?.replace(/[#*`_>~]/g, '').slice(0, 80) || 'Untitled gem'}</span>
-                    <span className="mt-1 block text-xs text-muted-foreground">{gem.book} {gem.chapter}:{gem.verse}</span>
-                  </span>
-                  <span className="ml-3 shrink-0 text-xs text-primary">Open</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
         <div className="space-y-4">
-          {displayedGems.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No gems found for this verse yet.</p>
+          {searchResults ? (
+            displayedGems.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No gems found for your search.</p>
+            ) : (
+              displayedGems.map((gem) => (
+                <GemCard
+                  key={gem.id}
+                  gem={gem}
+                  isOwn={gem.user_id === user.id}
+                  currentUserId={user.id}
+                  onLike={handleLikeGem}
+                  onFollow={handleFollow}
+                  onHide={handleHideGem}
+                  onReport={() => setReportTarget(gem)}
+                  onEdit={handleEditGem}
+                  onDelete={handleDeleteGem}
+                  onProfileClick={(id) => navigate(`/profile/${id}`)}
+                  onNavigateVerse={(book, chapter, verse) => {
+                    applyVerseSelection(book, chapter, verse);
+                  }}
+                  onTagSelect={handleTagSelect}
+                  showReference
+                  canDelete={isAdmin}
+                  isFollowing={follows.some((item) => item.following_id === gem.user_id)}
+                />
+              ))
+            )
+          ) : visibleVerseGroups.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No gems found for this chapter yet.</p>
           ) : (
-            displayedGems.map((gem) => (
-              <GemCard
-                key={gem.id}
-                gem={gem}
-                isOwn={gem.user_id === user.id}
-                currentUserId={user.id}
-                onLike={handleLikeGem}
-                onFollow={handleFollow}
-                onHide={handleHideGem}
-                onReport={() => setReportTarget(gem)}
-                onEdit={handleEditGem}
-                onDelete={handleDeleteGem}
-                onProfileClick={(id) => navigate(`/profile/${id}`)}
-                onNavigateVerse={(book, chapter, verse) => {
-                  applyVerseSelection(book, chapter, verse);
-                }}
-                onTagSelect={handleTagSelect}
-                showReference
-                isFollowing={follows.some((item) => item.following_id === gem.user_id)}
-              />
+            visibleVerseGroups.map(({ verse, gems: verseGems }) => (
+              <section key={verse} className="rounded-2xl border border-border/70 bg-background/60 p-4">
+                <button
+                  onClick={() => applyVerseSelection(book, chapter, verse)}
+                  className="flex w-full items-center justify-between rounded-xl border border-border/70 bg-card/70 px-3 py-2 text-left transition-colors hover:bg-accent"
+                >
+                  <span className="text-sm font-semibold text-foreground">Verse {verse}</span>
+                  <span className="text-xs text-muted-foreground">{verseGems.length} gem{verseGems.length !== 1 ? 's' : ''}</span>
+                </button>
+                <div className="mt-3 space-y-3">
+                  {verseGems.map((gem) => (
+                    <GemCard
+                      key={gem.id}
+                      gem={gem}
+                      isOwn={gem.user_id === user.id}
+                      currentUserId={user.id}
+                      onLike={handleLikeGem}
+                      onFollow={handleFollow}
+                      onHide={handleHideGem}
+                      onReport={() => setReportTarget(gem)}
+                      onEdit={handleEditGem}
+                      onDelete={handleDeleteGem}
+                      onProfileClick={(id) => navigate(`/profile/${id}`)}
+                      onNavigateVerse={(nextBook, nextChapter, nextVerse) => {
+                        applyVerseSelection(nextBook, nextChapter, nextVerse);
+                      }}
+                      onTagSelect={handleTagSelect}
+                      showReference
+                      canDelete={isAdmin}
+                      isFollowing={follows.some((item) => item.following_id === gem.user_id)}
+                    />
+                  ))}
+                </div>
+              </section>
             ))
+          )}
+          {!searchResults && hasMoreVerseGroups && (
+            <Button variant="outline" className="w-full" onClick={() => setVisibleVerseCount((count) => count + 8)}>
+              Show more verses
+            </Button>
           )}
         </div>
       <p>&nbsp;</p>

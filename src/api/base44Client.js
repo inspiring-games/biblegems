@@ -32,7 +32,11 @@ const entityProxy = (entityName) => {
     filter: async (filters = {}) => {
       let query = supabase.from(tableName).select('*');
       if (Object.keys(filters).length > 0) {
-        query = query.match(filters);
+        if (tableName === 'gems' && filters.book && filters.chapter && filters.verse === undefined && filters.user_id === undefined) {
+          query = query.eq('book', filters.book).eq('chapter', filters.chapter).order('verse', { ascending: true });
+        } else {
+          query = query.match(filters);
+        }
       }
       const { data, error } = await query;
       if (error) throw error;

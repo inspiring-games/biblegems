@@ -1,7 +1,6 @@
 import React from 'react';
 import { BIBLE_BOOKS } from '@/lib/bibleData';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Book } from 'lucide-react';
 
 // Navigation button component
 function NavBtn({ onClick, title, children }) {
@@ -16,37 +15,11 @@ function NavBtn({ onClick, title, children }) {
   );
 }
 
-export default function ScriptureSelector({ book, chapter, verse, onSelect }) {
+export default function ScriptureSelector({ book, chapter, onSelect }) {
   const bookIndex = BIBLE_BOOKS.findIndex(b => b.name === book);
   const selectedBookData = BIBLE_BOOKS[bookIndex];
   const chapterCount = selectedBookData?.chapters || 1;
   const chapterNumbers = Array.from({ length: chapterCount }, (_, i) => i + 1);
-  const verseNumbers = Array.from({ length: 176 }, (_, i) => i + 1);
-
-  // ── Navigation helpers ──────────────────────────────────────────────
-
-  const prevVerse = () => {
-    if (verse > 1) { onSelect(book, chapter, verse - 1); return; }
-    // At verse 1 — go to last verse of previous chapter
-    if (chapter > 1) {
-      // We don't know last verse exactly, use 176 as max and let the verse display handle missing
-      onSelect(book, chapter - 1, 176);
-      return;
-    }
-    // At chapter 1, verse 1 — go to last chapter/verse of previous book
-    if (bookIndex > 0) {
-      const prevBook = BIBLE_BOOKS[bookIndex - 1];
-      onSelect(prevBook.name, prevBook.chapters, 176);
-    }
-    // Genesis 1:1 — do nothing
-  };
-
-  const nextVerse = () => {
-    // We optimistically advance; if verse doesn't exist the VerseDisplay will show empty
-    // Move to next chapter when verse > max (we use 176 as hard cap)
-    onSelect(book, chapter, verse + 1);
-    // We'll rely on the parent to clamp via actual verse data
-  };
 
   const prevChapter = () => {
     if (chapter > 1) { onSelect(book, chapter - 1, 1); return; }
@@ -98,27 +71,15 @@ export default function ScriptureSelector({ book, chapter, verse, onSelect }) {
           </SelectContent>
         </Select>
 
-        <Select value={String(verse)} onValueChange={(val) => onSelect(book, chapter, Number(val))}>
-          <SelectTrigger className="w-full sm:w-28 bg-card border-border">
-            <SelectValue placeholder="Vs" />
-          </SelectTrigger>
-          <SelectContent className="max-h-64">
-            {verseNumbers.map(n => (
-              <SelectItem key={n} value={String(n)}>v. {n}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Navigation arrows */}
       <div className="flex items-center gap-0.5">
         <NavBtn onClick={prevBook} title="Previous book">«</NavBtn>
         <NavBtn onClick={prevChapter} title="Previous chapter">‹‹</NavBtn>
-        <NavBtn onClick={prevVerse} title="Previous verse">‹</NavBtn>
         <span className="flex-1 text-center font-heading text-2xl font-semibold">
-          {book} {chapter}:{verse}
+          {book} {chapter}
         </span>
-        <NavBtn onClick={nextVerse} title="Next verse">›</NavBtn>
         <NavBtn onClick={nextChapter} title="Next chapter">››</NavBtn>
         <NavBtn onClick={nextBook} title="Next book">»</NavBtn>
       </div>

@@ -9,6 +9,7 @@ import ScrollToTop from './components/ScrollToTop';
 import AppLayout from '@/components/layout/AppLayout';
 import Home from '@/pages/Home';
 import Profile from '@/pages/Profile';
+import Recent from '@/pages/Recent';
 import Admin from '@/pages/Admin';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
@@ -47,6 +48,7 @@ const AuthenticatedApp = () => {
         <Route path="/" element={<Home />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/profile/:userId" element={<Profile />} />
+        <Route path="/recent" element={<Recent />} />
         <Route path="/admin" element={<Admin />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />

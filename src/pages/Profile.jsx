@@ -473,6 +473,10 @@ export default function Profile() {
                 isOwn={gem.user_id === user?.id}
                 currentUserId={user?.id}
                 onProfileClick={(id) => navigate(`/profile/${id}`)}
+                onNavigateVerse={(book, chapter, verse) => {
+                  navigate(`/?book=${encodeURIComponent(book)}&chapter=${chapter}&verse=${verse}`);
+                }}
+                canDelete={user?.role === 'admin'}
                 showReference
               />
             ))

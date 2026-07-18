@@ -13,7 +13,10 @@ export default function AppHeader({ user }) {
   const isAdmin = user?.role === 'admin';
   const initials = (user?.full_name || user?.email || 'U').slice(0, 2).toUpperCase();
 
-  const navItems = [{ label: 'Home', path: '/' }];
+  const navItems = [
+    { label: 'Home', path: '/' },
+    { label: 'Recent', path: '/recent' }
+  ];
   if (user) navItems.push({ label: 'My Profile', path: '/profile' });
   if (isAdmin) navItems.push({ label: 'Admin', path: '/admin' });
 
