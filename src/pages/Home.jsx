@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useOutletContext, useNavigate, Link } from 'react-router-dom';
+import { useOutletContext, useNavigate, Link, useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { tables } from '@/api/supabaseClient';
 import { insertReport } from '@/api/reporting';
@@ -10,7 +10,7 @@ import GemCard from '@/components/gems/GemCard';
 import GemEditor from '@/components/gems/GemEditor';
 import ReportDialog from '@/components/gems/ReportDialog';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, Sparkles, LogIn } from 'lucide-react';
+import { Loader2, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const STORAGE_KEY = 'biblegems_last_verse';
@@ -23,19 +23,38 @@ function loadSavedVerse() {
   return null;
 }
 
+function parseVerseSelection(search = '') {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams(search);
+  const book = params.get('book');
+  const chapter = Number(params.get('chapter'));
+  const verse = Number(params.get('verse'));
+
+  if (!book || Number.isNaN(chapter) || Number.isNaN(verse)) return null;
+  return { book, chapter, verse };
+}
+
+function buildVerseUrl(book, chapter, verse) {
+  if (typeof window === 'undefined') return '';
+  const params = new URLSearchParams({ book, chapter: String(chapter), verse: String(verse) });
+  return `?${params.toString()}`;
+}
+
 export default function Home() {
   const { user } = useOutletContext();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
 
-  const saved = loadSavedVerse();
-  const [book, setBook] = useState(saved?.book || 'John');
-  const [chapter, setChapter] = useState(saved?.chapter || 3);
-  const [verse, setVerse] = useState(saved?.verse || 16);
+  const initialSelection = parseVerseSelection(location.search) || loadSavedVerse() || { book: 'John', chapter: 3, verse: 16 };
+  const [book, setBook] = useState(initialSelection.book);
+  const [chapter, setChapter] = useState(initialSelection.chapter);
+  const [verse, setVerse] = useState(initialSelection.verse);
 
   const [verseText, setVerseText] = useState('');
   const [translationId, setTranslationId] = useState('');
   const [gems, setGems] = useState([]);
+  const [recentGems, setRecentGems] = useState([]);
   const [follows, setFollows] = useState([]);
   const [blockedIds, setBlockedIds] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -57,6 +76,51 @@ export default function Home() {
       .then((results) => setBlockedIds(results.map((row) => row.blocked_id)))
       .catch(() => {});
   }, [user]);
+
+  const applyVerseSelection = useCallback((nextBook, nextChapter, nextVerse, mode = 'push') => {
+    setBook(nextBook);
+    setChapter(nextChapter);
+    setVerse(nextVerse);
+
+    if (typeof window === 'undefined') return;
+    const nextUrl = buildVerseUrl(nextBook, nextChapter, nextVerse);
+    const path = `${window.location.pathname}${nextUrl}`;
+
+    if (mode === 'replace') {
+      window.history.replaceState({ book: nextBook, chapter: nextChapter, verse: nextVerse }, '', path);
+    } else {
+      window.history.pushState({ book: nextBook, chapter: nextChapter, verse: nextVerse }, '', path);
+    }
+  }, []);
+
+  useEffect(() => {
+    const parsed = parseVerseSelection(location.search);
+    if (parsed) {
+      setBook(parsed.book);
+      setChapter(parsed.chapter);
+      setVerse(parsed.verse);
+      return;
+    }
+
+    if (typeof window !== 'undefined') {
+      const currentUrl = buildVerseUrl(book, chapter, verse);
+      const path = `${window.location.pathname}${currentUrl}`;
+      window.history.replaceState({ book, chapter, verse }, '', path);
+    }
+  }, [book, chapter, verse, location.search]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const parsed = parseVerseSelection(window.location.search);
+      if (!parsed) return;
+      setBook(parsed.book);
+      setChapter(parsed.chapter);
+      setVerse(parsed.verse);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     const pref = user?.preferred_translation || 'KJV';
@@ -85,12 +149,22 @@ export default function Home() {
       .finally(() => setLoading(false));
   }, [book, chapter, verse]);
 
+  const loadRecentGems = useCallback(async () => {
+    try {
+      const results = await base44.entities.Gem.list('-created_date', 6);
+      setRecentGems(results || []);
+    } catch {
+      setRecentGems([]);
+    }
+  }, []);
+
   useEffect(() => {
     loadGems();
+    loadRecentGems();
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ book, chapter, verse }));
     } catch {}
-  }, [book, chapter, verse, loadGems]);
+  }, [book, chapter, verse, loadGems, loadRecentGems]);
 
   useEffect(() => {
     const query = search.trim().toLowerCase();
@@ -142,6 +216,7 @@ export default function Home() {
       }
       resetEditor();
       loadGems();
+      loadRecentGems();
     } catch (error) {
       console.error('Could not save gem', error);
       toast({ title: 'Unable to save gem', description: error.message || 'Please try again.' });
@@ -161,6 +236,7 @@ export default function Home() {
       setEditingGem(null);
       setShowEditor(false);
       loadGems();
+      loadRecentGems();
     } catch (error) {
       console.error('Could not update gem', error);
       toast({ title: 'Unable to update gem', description: error.message || 'Please try again.' });
@@ -253,8 +329,8 @@ export default function Home() {
   };
 
   const visibleGems = gems.filter((gem) => !blockedIds.includes(gem.user_id));
+  const visibleRecentGems = recentGems.filter((gem) => !blockedIds.includes(gem.user_id));
   const displayedGems = searchResults ?? visibleGems;
-  const verseReference = `${book} ${chapter}:${verse}`;
 
   if (!user) {
     return (
@@ -290,9 +366,7 @@ export default function Home() {
           chapter={chapter}
           verse={verse}
           onSelect={(newBook, newChapter, newVerse) => {
-            setBook(newBook);
-            setChapter(newChapter);
-            setVerse(newVerse);
+            applyVerseSelection(newBook, newChapter, newVerse);
           }}
         />
 
@@ -317,6 +391,31 @@ export default function Home() {
           {loading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
         </div>
 
+        <div className="mb-6 rounded-2xl border border-border/70 bg-background/60 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Recent</p>
+          </div>
+          {visibleRecentGems.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No recent gems yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {visibleRecentGems.map((gem) => (
+                <button
+                  key={gem.id}
+                  onClick={() => applyVerseSelection(gem.book, gem.chapter, gem.verse)}
+                  className="flex w-full items-start justify-between rounded-xl border border-border/70 bg-card/70 px-3 py-2 text-left transition-colors hover:bg-accent"
+                >
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-foreground">{gem.content?.replace(/[#*`_>~]/g, '').slice(0, 80) || 'Untitled gem'}</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">{gem.book} {gem.chapter}:{gem.verse}</span>
+                  </span>
+                  <span className="ml-3 shrink-0 text-xs text-primary">Open</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="space-y-4">
           {displayedGems.length === 0 ? (
             <p className="text-sm text-muted-foreground">No gems found for this verse yet.</p>
@@ -335,9 +434,7 @@ export default function Home() {
                 onDelete={handleDeleteGem}
                 onProfileClick={(id) => navigate(`/profile/${id}`)}
                 onNavigateVerse={(book, chapter, verse) => {
-                  setBook(book);
-                  setChapter(chapter);
-                  setVerse(verse);
+                  applyVerseSelection(book, chapter, verse);
                 }}
                 onTagSelect={handleTagSelect}
                 showReference

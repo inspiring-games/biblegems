@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import { Heart, UserPlus, UserCheck, EyeOff, Flag, ChevronDown, ChevronUp, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { BIBLE_BOOKS, formatReference } from '@/lib/bibleData';
+import { formatReference, extractBibleReferences } from '@/lib/bibleData';
 import moment from 'moment';
 import GemEditor from '@/components/gems/GemEditor';
 import { base44 } from '@/api/base44Client';
@@ -61,24 +61,7 @@ export default function GemCard({
 
   const linkedReferences = useMemo(() => {
     if (!gem.content) return [];
-    const matches = [];
-    const referencePattern = /(?<book>(?:[1-3]\s+)?[A-Za-z]+(?:\s+[A-Za-z]+)?)\s+(?<chapter>\d{1,3})(?::(?<verse>\d{1,3})(?:-(?<endVerse>\d{1,3}))?)?/g;
-    for (const match of gem.content.matchAll(referencePattern)) {
-      const groups = match.groups || {};
-      const normalizedBook = (groups.book || '').trim().replace(/^\d+\s+/, '');
-      const matchedBook = BIBLE_BOOKS.find((book) => book.name.toLowerCase() === normalizedBook.toLowerCase());
-      const bookName = matchedBook?.name || normalizedBook;
-      const chapter = Number(groups.chapter || 1);
-      const verse = Number(groups.verse || 1);
-      if (!bookName) continue;
-      matches.push({
-        label: match[0],
-        book: bookName,
-        chapter,
-        verse
-      });
-    }
-    return matches;
+    return extractBibleReferences(gem.content);
   }, [gem.content]);
 
   const hashtags = useMemo(() => {

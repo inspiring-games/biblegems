@@ -74,6 +74,48 @@ export function getBookOrder(bookName) {
   return BOOK_INDEX[bookName] ?? 999;
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function extractBibleReferences(content) {
+  if (!content) return [];
+
+  const bookNames = BIBLE_BOOKS
+    .map((book) => book.name)
+    .sort((a, b) => b.length - a.length);
+
+  const referencePattern = new RegExp(
+    `(?<![A-Za-z])(${bookNames.map(escapeRegExp).join('|')})\\s+(\\d{1,3})(?::(\\d{1,3})(?:-(\\d{1,3}))?)?`,
+    'gi'
+  );
+
+  const references = [];
+  const ignoredLeadingWords = new Set(['and', 'or', 'the', 'a', 'an', 'of', 'to', 'from', 'for', 'in', 'on', 'with', 'by', 'at', 'as', 'that', 'this']);
+
+  for (const match of content.matchAll(referencePattern)) {
+    const bookName = match[1]?.trim();
+    const chapter = Number(match[2] || 1);
+    const verse = Number(match[3] || 1);
+
+    const matchedBook = BIBLE_BOOKS.find((book) => book.name.toLowerCase() === bookName.toLowerCase());
+    if (!matchedBook) continue;
+
+    const prefix = content.slice(0, match.index).trimEnd();
+    const previousWord = prefix.split(/\s+/).pop()?.toLowerCase();
+    if (previousWord && ignoredLeadingWords.has(previousWord)) continue;
+
+    references.push({
+      label: match[0].trim(),
+      book: matchedBook.name,
+      chapter,
+      verse
+    });
+  }
+
+  return references;
+}
+
 export function formatReference(book, chapter, verse) {
   return `${book} ${chapter}:${verse}`;
 }
