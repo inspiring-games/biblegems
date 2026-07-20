@@ -4,7 +4,6 @@ import { base44 } from '@/api/base44Client';
 import { tables } from '@/api/supabaseClient';
 import { insertReport } from '@/api/reporting';
 import ScriptureSelector from '@/components/bible/ScriptureSelector';
-import VerseDisplay from '@/components/bible/VerseDisplay';
 import SearchBar from '@/components/bible/SearchBar';
 import GemCard from '@/components/gems/GemCard';
 import GemEditor from '@/components/gems/GemEditor';
@@ -67,6 +66,12 @@ export default function Home() {
 
   const [reportTarget, setReportTarget] = useState(null);
   const [reportSubmitting, setReportSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.__biblegemsSupabaseDebug?.reset) {
+      window.__biblegemsSupabaseDebug.reset();
+    }
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -146,7 +151,12 @@ export default function Home() {
   const loadGems = useCallback(() => {
     setLoading(true);
     base44.entities.Gem.filter({ book, chapter })
-      .then((results) => setGems(results || []))
+      .then((results) => {
+        setGems(results || []);
+        if (typeof window !== 'undefined' && window.__biblegemsSupabaseDebug?.logSummary) {
+          window.__biblegemsSupabaseDebug.logSummary(`gems:${book}:${chapter}`);
+        }
+      })
       .catch(() => setGems([]))
       .finally(() => setLoading(false));
   }, [book, chapter]);
@@ -377,9 +387,6 @@ export default function Home() {
             applyVerseSelection(newBook, newChapter, newVerse || 1);
           }}
         />
-
-      {/* Verse display */}
-        <VerseDisplay book={book} chapter={chapter} verse={verse} text={verseText} translation={translationId} />
       </div>
 
       {/* Search bar */}

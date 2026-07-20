@@ -3,6 +3,79 @@
 // service calls are routed to Supabase.
 import { supabase, supabaseAuth } from '@/api/supabaseClient';
 
+const supabaseDebug = {
+  queryCount: 0,
+  queries: [],
+  reset() {
+    this.queryCount = 0;
+    this.queries = [];
+  },
+  getSummary() {
+    const totalMs = this.queries.reduce((sum, item) => sum + (item.elapsedMs || 0), 0);
+    const slowest = this.queries.reduce((current, item) => (item.elapsedMs > (current?.elapsedMs || 0) ? item : current), null);
+    return {
+      queryCount: this.queryCount,
+      totalMs,
+      averageMs: this.queries.length ? Math.round(totalMs / this.queries.length) : 0,
+      slowest
+    };
+  },
+  logSummary(label = 'supabase') {
+    const summary = this.getSummary();
+    console.info(`[supabase:summary] ${label}`, summary);
+    return summary;
+  }
+};
+
+if (typeof window !== 'undefined') {
+  window.__biblegemsSupabaseDebug = supabaseDebug;
+}
+
+function nowMs() {
+  return typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now();
+}
+
+async function runSupabaseQuery(queryBuilder, { tableName, operation, context = {} }) {
+  const startedAt = nowMs();
+  const queryNumber = supabaseDebug.queryCount + 1;
+  supabaseDebug.queryCount = queryNumber;
+
+  try {
+    const { data, error } = await queryBuilder;
+    const elapsedMs = Math.round(nowMs() - startedAt);
+
+    const entry = {
+      queryNumber,
+      tableName,
+      operation,
+      elapsedMs,
+      context,
+      error: error ? { message: error.message } : null
+    };
+
+    supabaseDebug.queries.push(entry);
+
+    console.info(`[supabase:${queryNumber}] ${tableName}.${operation} ${elapsedMs}ms`, context);
+    if (error) throw error;
+    return { data, error };
+  } catch (error) {
+    const elapsedMs = Math.round(nowMs() - startedAt);
+    const entry = {
+      queryNumber,
+      tableName,
+      operation,
+      elapsedMs,
+      context,
+      error: { message: error?.message || String(error) }
+    };
+    supabaseDebug.queries.push(entry);
+    console.error(`[supabase:${queryNumber}] ${tableName}.${operation} failed in ${elapsedMs}ms`, context, error);
+    throw error;
+  }
+}
+
 const entityMap = {
   Gem: 'gems',
   BibleVerse: 'bible_verses',
@@ -25,7 +98,7 @@ const entityProxy = (entityName) => {
         query = query.order(column, { ascending });
       }
       if (limit) query = query.limit(limit);
-      const { data, error } = await query;
+      const { data, error } = await runSupabaseQuery(query, { tableName, operation: 'list', context: { sort, limit } });
       if (error) throw error;
       return data || [];
     },
@@ -38,27 +111,27 @@ const entityProxy = (entityName) => {
           query = query.match(filters);
         }
       }
-      const { data, error } = await query;
+      const { data, error } = await runSupabaseQuery(query, { tableName, operation: 'filter', context: filters });
       if (error) throw error;
       return data || [];
     },
     create: async (payload) => {
-      const { data, error } = await supabase.from(tableName).insert(payload).select();
+      const { data, error } = await runSupabaseQuery(supabase.from(tableName).insert(payload).select(), { tableName, operation: 'create', context: payload });
       if (error) throw error;
       return Array.isArray(data) ? data[0] : data;
     },
     bulkCreate: async (payload) => {
-      const { data, error } = await supabase.from(tableName).insert(payload).select();
+      const { data, error } = await runSupabaseQuery(supabase.from(tableName).insert(payload).select(), { tableName, operation: 'bulkCreate', context: { count: payload?.length || 0 } });
       if (error) throw error;
       return data || [];
     },
     update: async (id, payload) => {
-      const { data, error } = await supabase.from(tableName).update(payload).eq('id', id).select();
+      const { data, error } = await runSupabaseQuery(supabase.from(tableName).update(payload).eq('id', id).select(), { tableName, operation: 'update', context: { id, payload } });
       if (error) throw error;
       return Array.isArray(data) ? data[0] : data;
     },
     delete: async (id) => {
-      const { data, error } = await supabase.from(tableName).delete().eq('id', id).select();
+      const { data, error } = await runSupabaseQuery(supabase.from(tableName).delete().eq('id', id).select(), { tableName, operation: 'delete', context: { id } });
       if (error) throw error;
       return data || [];
     }

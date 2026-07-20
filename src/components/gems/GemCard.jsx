@@ -8,6 +8,47 @@ import moment from 'moment';
 import GemEditor from '@/components/gems/GemEditor';
 import { base44 } from '@/api/base44Client';
 
+const userDisplayCache = new Map();
+
+async function resolveUserDisplay(gem) {
+  if (!gem?.user_id) {
+    return {
+      name: gem?.user_nickname || 'Anonymous',
+      avatar: gem?.user_avatar
+    };
+  }
+
+  const cached = userDisplayCache.get(gem.user_id);
+  if (cached) {
+    return cached;
+  }
+
+  const fallback = {
+    name: gem?.user_nickname || 'Anonymous',
+    avatar: gem?.user_avatar
+  };
+
+  if (gem?.user_avatar && gem?.user_nickname) {
+    userDisplayCache.set(gem.user_id, fallback);
+    return fallback;
+  }
+
+  try {
+    const users = await base44.entities.User.filter({ user_id: gem.user_id });
+    const resolved = users.length > 0
+      ? {
+          name: users[0].full_name || users[0].nickname || gem?.user_nickname || 'Anonymous',
+          avatar: users[0].avatar || gem?.user_avatar
+        }
+      : fallback;
+    userDisplayCache.set(gem.user_id, resolved);
+    return resolved;
+  } catch (error) {
+    userDisplayCache.set(gem.user_id, fallback);
+    return fallback;
+  }
+}
+
 export default function GemCard({
   gem,
   isOwn,
@@ -31,29 +72,20 @@ export default function GemCard({
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
+    let active = true;
+
     const fetchUserDisplay = async () => {
-      try {
-        const users = await base44.entities.User.filter({ user_id: gem.user_id });
-        if (users.length > 0) {
-          const user = users[0];
-          setUserDisplay({
-            name: user.full_name || user.nickname || gem.user_nickname || 'Anonymous',
-            avatar: user.avatar || gem.user_avatar
-          });
-        } else {
-          setUserDisplay({
-            name: gem.user_nickname || 'Anonymous',
-            avatar: gem.user_avatar
-          });
-        }
-      } catch (error) {
-        setUserDisplay({
-          name: gem.user_nickname || 'Anonymous',
-          avatar: gem.user_avatar
-        });
+      const resolved = await resolveUserDisplay(gem);
+      if (active) {
+        setUserDisplay(resolved);
       }
     };
+
     fetchUserDisplay();
+
+    return () => {
+      active = false;
+    };
   }, [gem.user_id, gem.user_nickname, gem.user_avatar]);
 
   const isLiked = gem.liked_by?.includes(currentUserId);
