@@ -13,6 +13,8 @@ import { Loader2, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const STORAGE_KEY = 'biblegems_last_verse';
+const CHAPTER_PAGE_CACHE_PREFIX = 'biblegems_chapter_page';
+const CHAPTER_PAGE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 function loadSavedVerse() {
   try {
@@ -37,6 +39,44 @@ function buildVerseUrl(book, chapter, verse) {
   if (typeof window === 'undefined') return '';
   const params = new URLSearchParams({ book, chapter: String(chapter), verse: String(verse) });
   return `?${params.toString()}`;
+}
+
+function getChapterPageCacheKey(book, chapter) {
+  return `${CHAPTER_PAGE_CACHE_PREFIX}:${book}:${chapter}`;
+}
+
+function readChapterPageCache(book, chapter) {
+  if (typeof window === 'undefined' || !window.localStorage) return null;
+  try {
+    const raw = window.localStorage.getItem(getChapterPageCacheKey(book, chapter));
+    if (!raw) return null;
+    const entry = JSON.parse(raw);
+    if (!entry || typeof entry.expiresAt !== 'number' || entry.expiresAt <= Date.now()) {
+      window.localStorage.removeItem(getChapterPageCacheKey(book, chapter));
+      return null;
+    }
+    return entry;
+  } catch {
+    return null;
+  }
+}
+
+function writeChapterPageCache(book, chapter, payload) {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    const entry = {
+      expiresAt: Date.now() + CHAPTER_PAGE_CACHE_TTL_MS,
+      payload
+    };
+    window.localStorage.setItem(getChapterPageCacheKey(book, chapter), JSON.stringify(entry));
+  } catch {}
+}
+
+function invalidateChapterPageCache(book, chapter) {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    window.localStorage.removeItem(getChapterPageCacheKey(book, chapter));
+  } catch {}
 }
 
 export default function Home() {
@@ -129,45 +169,61 @@ export default function Home() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  useEffect(() => {
+  const loadChapterPageData = useCallback(async (forceRefresh = false) => {
+    if (typeof window === 'undefined') return;
+
     const pref = user?.preferred_translation || 'KJV';
+    const cached = !forceRefresh ? readChapterPageCache(book, chapter) : null;
 
-    base44.entities.BibleVerse.filter({ book: book.toLowerCase(), chapter, verse, translation_id: pref })
-      .then((results) => {
-        if (results.length > 0) {
-          setVerseText(results[0].text);
-          setTranslationId(pref);
-        } else {
-          setVerseText('');
-          setTranslationId('');
-        }
-      })
-      .catch(() => {
-        setVerseText('');
-        setTranslationId('');
-      });
-  }, [book, chapter, verse, user]);
+    if (cached?.payload) {
+      setGems(cached.payload.gems || []);
+      setVerseText(cached.payload.verseText || '');
+      setTranslationId(cached.payload.translationId || '');
+      setLoading(false);
+      return;
+    }
 
-  const loadGems = useCallback(() => {
     setLoading(true);
-    base44.entities.Gem.filter({ book, chapter })
-      .then((results) => {
-        setGems(results || []);
-        if (typeof window !== 'undefined' && window.__biblegemsSupabaseDebug?.logSummary) {
-          window.__biblegemsSupabaseDebug.logSummary(`gems:${book}:${chapter}`);
-        }
-      })
-      .catch(() => setGems([]))
-      .finally(() => setLoading(false));
-  }, [book, chapter]);
+
+    try {
+      const [verseResults, gemResults] = await Promise.all([
+        base44.entities.BibleVerse.filter({ book: book.toLowerCase(), chapter, verse, translation_id: pref }),
+        base44.entities.Gem.filter({ book, chapter })
+      ]);
+
+      const nextVerseText = verseResults?.length > 0 ? verseResults[0].text : '';
+      const nextGems = gemResults || [];
+
+      setGems(nextGems);
+      setVerseText(nextVerseText);
+      setTranslationId(pref);
+
+      writeChapterPageCache(book, chapter, {
+        gems: nextGems,
+        verseText: nextVerseText,
+        translationId: pref
+      });
+
+      if (typeof window !== 'undefined' && window.__biblegemsSupabaseDebug?.logSummary) {
+        window.__biblegemsSupabaseDebug.logSummary(`gems:${book}:${chapter}`);
+      }
+    } catch (error) {
+      console.error('Failed to load chapter page data', error);
+      setGems([]);
+      setVerseText('');
+      setTranslationId('');
+    } finally {
+      setLoading(false);
+    }
+  }, [book, chapter, verse, user]);
 
   useEffect(() => {
     setVisibleVerseCount(8);
-    loadGems();
+    loadChapterPageData(false);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ book, chapter, verse }));
     } catch {}
-  }, [book, chapter, verse, loadGems]);
+  }, [book, chapter, verse, loadChapterPageData]);
 
   useEffect(() => {
     const query = search.trim().toLowerCase();
@@ -218,7 +274,8 @@ export default function Home() {
         toast({ title: 'Gem saved' });
       }
       resetEditor();
-      loadGems();
+      invalidateChapterPageCache(book, chapter);
+      loadChapterPageData(true);
     } catch (error) {
       console.error('Could not save gem', error);
       toast({ title: 'Unable to save gem', description: error.message || 'Please try again.' });
@@ -237,7 +294,8 @@ export default function Home() {
       toast({ title: 'Gem updated' });
       setEditingGem(null);
       setShowEditor(false);
-      loadGems();
+      invalidateChapterPageCache(book, chapter);
+      loadChapterPageData(true);
     } catch (error) {
       console.error('Could not update gem', error);
       toast({ title: 'Unable to update gem', description: error.message || 'Please try again.' });

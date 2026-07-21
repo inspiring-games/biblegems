@@ -9,6 +9,7 @@ import GemEditor from '@/components/gems/GemEditor';
 import { base44 } from '@/api/base44Client';
 
 const userDisplayCache = new Map();
+const userDisplayPending = new Map();
 
 async function resolveUserDisplay(gem) {
   if (!gem?.user_id) {
@@ -23,6 +24,10 @@ async function resolveUserDisplay(gem) {
     return cached;
   }
 
+  if (userDisplayPending.has(gem.user_id)) {
+    return userDisplayPending.get(gem.user_id);
+  }
+
   const fallback = {
     name: gem?.user_nickname || 'Anonymous',
     avatar: gem?.user_avatar
@@ -33,20 +38,27 @@ async function resolveUserDisplay(gem) {
     return fallback;
   }
 
-  try {
-    const users = await base44.entities.User.filter({ user_id: gem.user_id });
-    const resolved = users.length > 0
-      ? {
-          name: users[0].full_name || users[0].nickname || gem?.user_nickname || 'Anonymous',
-          avatar: users[0].avatar || gem?.user_avatar
-        }
-      : fallback;
-    userDisplayCache.set(gem.user_id, resolved);
-    return resolved;
-  } catch (error) {
-    userDisplayCache.set(gem.user_id, fallback);
-    return fallback;
-  }
+  const pendingRequest = (async () => {
+    try {
+      const users = await base44.entities.User.filter({ user_id: gem.user_id });
+      const resolved = users.length > 0
+        ? {
+            name: users[0].full_name || users[0].nickname || gem?.user_nickname || 'Anonymous',
+            avatar: users[0].avatar || gem?.user_avatar
+          }
+        : fallback;
+      userDisplayCache.set(gem.user_id, resolved);
+      return resolved;
+    } catch (error) {
+      userDisplayCache.set(gem.user_id, fallback);
+      return fallback;
+    } finally {
+      userDisplayPending.delete(gem.user_id);
+    }
+  })();
+
+  userDisplayPending.set(gem.user_id, pendingRequest);
+  return pendingRequest;
 }
 
 export default function GemCard({

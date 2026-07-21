@@ -2,6 +2,7 @@
 // This lets the current app keep using `base44.auth` and `base44.entities` while
 // service calls are routed to Supabase.
 import { supabase, supabaseAuth } from '@/api/supabaseClient';
+import { getCacheKey, readCacheEntry, writeCacheEntry, invalidateTable } from '@/lib/queryCache';
 
 const supabaseDebug = {
   queryCount: 0,
@@ -38,6 +39,12 @@ function nowMs() {
 }
 
 async function runSupabaseQuery(queryBuilder, { tableName, operation, context = {} }) {
+  const cacheKey = getCacheKey(tableName, operation, context);
+  const cached = readCacheEntry(cacheKey);
+  if (cached && !cached.stale) {
+    return { data: cached.data, error: null };
+  }
+
   const startedAt = nowMs();
   const queryNumber = supabaseDebug.queryCount + 1;
   supabaseDebug.queryCount = queryNumber;
@@ -59,6 +66,10 @@ async function runSupabaseQuery(queryBuilder, { tableName, operation, context = 
 
     console.info(`[supabase:${queryNumber}] ${tableName}.${operation} ${elapsedMs}ms`, context);
     if (error) throw error;
+
+    if (typeof data !== 'undefined') {
+      writeCacheEntry(cacheKey, data);
+    }
     return { data, error };
   } catch (error) {
     const elapsedMs = Math.round(nowMs() - startedAt);
@@ -116,23 +127,27 @@ const entityProxy = (entityName) => {
       return data || [];
     },
     create: async (payload) => {
-      const { data, error } = await runSupabaseQuery(supabase.from(tableName).insert(payload).select(), { tableName, operation: 'create', context: payload });
+        const { data, error } = await runSupabaseQuery(supabase.from(tableName).insert(payload).select(), { tableName, operation: 'create', context: payload });
       if (error) throw error;
+      invalidateTable(tableName);
       return Array.isArray(data) ? data[0] : data;
     },
     bulkCreate: async (payload) => {
       const { data, error } = await runSupabaseQuery(supabase.from(tableName).insert(payload).select(), { tableName, operation: 'bulkCreate', context: { count: payload?.length || 0 } });
       if (error) throw error;
+      invalidateTable(tableName);
       return data || [];
     },
     update: async (id, payload) => {
       const { data, error } = await runSupabaseQuery(supabase.from(tableName).update(payload).eq('id', id).select(), { tableName, operation: 'update', context: { id, payload } });
       if (error) throw error;
+      invalidateTable(tableName);
       return Array.isArray(data) ? data[0] : data;
     },
     delete: async (id) => {
       const { data, error } = await runSupabaseQuery(supabase.from(tableName).delete().eq('id', id).select(), { tableName, operation: 'delete', context: { id } });
       if (error) throw error;
+      invalidateTable(tableName);
       return data || [];
     }
   };
