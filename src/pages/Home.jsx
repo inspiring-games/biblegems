@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 
 const STORAGE_KEY = 'biblegems_last_verse';
 const CHAPTER_PAGE_CACHE_PREFIX = 'biblegems_chapter_page';
-const CHAPTER_PAGE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const CHAPTER_PAGE_CACHE_TTL_MS = Number.MAX_SAFE_INTEGER;
 
 function loadSavedVerse() {
   try {
@@ -65,7 +65,7 @@ function writeChapterPageCache(book, chapter, payload) {
   if (typeof window === 'undefined' || !window.localStorage) return;
   try {
     const entry = {
-      expiresAt: Date.now() + CHAPTER_PAGE_CACHE_TTL_MS,
+      expiresAt: Number.MAX_SAFE_INTEGER,
       payload
     };
     window.localStorage.setItem(getChapterPageCacheKey(book, chapter), JSON.stringify(entry));
@@ -247,19 +247,54 @@ export default function Home() {
     setShowEditor(false);
   };
 
+  const syncChapterCache = useCallback((nextGems) => {
+    writeChapterPageCache(book, chapter, {
+      gems: nextGems,
+      verseText,
+      translationId
+    });
+  }, [book, chapter, verseText, translationId]);
+
   const handleSaveGem = async (content) => {
     if (!user) {
       navigate('/login');
       return;
     }
 
+    const previousGems = [...gems];
+    const optimisticGem = {
+      id: `temp-${Date.now()}`,
+      book,
+      chapter,
+      verse,
+      content,
+      user_id: user.id,
+      user_nickname: user.nickname || user.full_name || user.email?.split('@')[0] || 'Anonymous',
+      user_avatar: user.avatar || null,
+      likes_count: 0,
+      liked_by: [user.id],
+      created_date: new Date().toISOString()
+    };
+
+    let nextGems;
+    if (editingGem) {
+      nextGems = previousGems.map((gem) => gem.id === editingGem.id ? { ...gem, content } : gem);
+      setGems(nextGems);
+      syncChapterCache(nextGems);
+    } else {
+      nextGems = [optimisticGem, ...previousGems];
+      setGems(nextGems);
+      syncChapterCache(nextGems);
+    }
+
     setSaving(true);
     try {
+      let savedGem;
       if (editingGem) {
-        await base44.entities.Gem.update(editingGem.id, { content });
+        savedGem = await base44.entities.Gem.update(editingGem.id, { content });
         toast({ title: 'Gem updated' });
       } else {
-        await base44.entities.Gem.create({
+        savedGem = await base44.entities.Gem.create({
           book,
           chapter,
           verse,
@@ -273,11 +308,19 @@ export default function Home() {
         });
         toast({ title: 'Gem saved' });
       }
+
+      const persistedGems = editingGem
+        ? nextGems.map((gem) => gem.id === editingGem.id ? { ...gem, ...(savedGem || {}), content: savedGem?.content ?? content } : gem)
+        : nextGems.map((gem) => gem.id === optimisticGem.id ? { ...gem, ...(savedGem || {}), content: savedGem?.content ?? content } : gem);
+
+      setGems(persistedGems);
+      syncChapterCache(persistedGems);
       resetEditor();
-      invalidateChapterPageCache(book, chapter);
-      loadChapterPageData(true);
+      void loadChapterPageData(true);
     } catch (error) {
       console.error('Could not save gem', error);
+      setGems(previousGems);
+      syncChapterCache(previousGems);
       toast({ title: 'Unable to save gem', description: error.message || 'Please try again.' });
     } finally {
       setSaving(false);
@@ -289,15 +332,25 @@ export default function Home() {
       navigate('/login');
       return;
     }
+
+    const previousGems = [...gems];
+    const optimisticGems = previousGems.map((item) => item.id === gem.id ? { ...item, content } : item);
+    setGems(optimisticGems);
+    syncChapterCache(optimisticGems);
+
     try {
-      await base44.entities.Gem.update(gem.id, { content });
+      const savedGem = await base44.entities.Gem.update(gem.id, { content });
+      const persistedGems = optimisticGems.map((item) => item.id === gem.id ? { ...item, ...(savedGem || {}), content: savedGem?.content ?? content } : item);
+      setGems(persistedGems);
+      syncChapterCache(persistedGems);
       toast({ title: 'Gem updated' });
       setEditingGem(null);
       setShowEditor(false);
-      invalidateChapterPageCache(book, chapter);
-      loadChapterPageData(true);
+      void loadChapterPageData(true);
     } catch (error) {
       console.error('Could not update gem', error);
+      setGems(previousGems);
+      syncChapterCache(previousGems);
       toast({ title: 'Unable to update gem', description: error.message || 'Please try again.' });
     }
   };
@@ -348,9 +401,22 @@ export default function Home() {
     }
   };
 
-  const handleDeleteGem = (gem) => {
-    setGems(gems.filter(g => g.id !== gem.id));
+  const handleDeleteGem = async (gem) => {
+    const previousGems = [...gems];
+    const optimisticGems = previousGems.filter((item) => item.id !== gem.id);
+    setGems(optimisticGems);
+    syncChapterCache(optimisticGems);
     toast({ title: 'Gem deleted' });
+
+    try {
+      await base44.entities.Gem.delete(gem.id);
+      void loadChapterPageData(true);
+    } catch (error) {
+      console.error('Could not delete gem', error);
+      setGems(previousGems);
+      syncChapterCache(previousGems);
+      toast({ title: 'Unable to delete gem', description: error.message || 'Please try again.' });
+    }
   };
 
   const handleHideGem = async (gem) => {
